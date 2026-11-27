@@ -476,16 +476,22 @@ struct KeyFile {
     secret_hex: String,
 }
 
+fn user_home_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+}
+
 fn expand_tilde(path: &Path) -> PathBuf {
     let raw = path.to_string_lossy();
     if raw == "~" {
-        if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home);
+        if let Some(home) = user_home_dir() {
+            return home;
         }
-    } else if let Some(rest) = raw.strip_prefix("~/")
-        && let Some(home) = std::env::var_os("HOME")
+    } else if let Some(rest) = raw.strip_prefix("~/").or_else(|| raw.strip_prefix("~\\"))
+        && let Some(home) = user_home_dir()
     {
-        return PathBuf::from(home).join(rest);
+        return home.join(rest);
     }
     path.to_path_buf()
 }
@@ -1754,8 +1760,10 @@ mod tests {
         assert!(md.contains("quod submit --project erdos-479"));
 
         let expanded = expand_tilde(Path::new("~/.config/quod/alice.json"));
-        if let Some(home) = std::env::var_os("HOME") {
-            assert_eq!(expanded, PathBuf::from(home).join(".config/quod/alice.json"));
+        let expanded_win = expand_tilde(Path::new("~\\.config\\quod\\alice.json"));
+        if let Some(home) = user_home_dir() {
+            assert_eq!(expanded, home.join(".config/quod/alice.json"));
+            assert_eq!(expanded_win, home.join(".config\\quod\\alice.json"));
         }
 
         let join_attr = Cli::try_parse_from([

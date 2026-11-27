@@ -742,11 +742,15 @@ fn module_olean_path(root: &Path, module: &str) -> PathBuf {
 }
 
 fn join_lean_paths(paths: &[PathBuf]) -> String {
+    if let Ok(joined) = std::env::join_paths(paths) {
+        return joined.to_string_lossy().into_owned();
+    }
+    let sep = if cfg!(windows) { ";" } else { ":" };
     paths
         .iter()
         .map(|p| p.display().to_string())
         .collect::<Vec<_>>()
-        .join(":")
+        .join(sep)
 }
 
 #[cfg(test)]

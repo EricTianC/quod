@@ -33,6 +33,7 @@ const WEB_OPS_HTML: &str = include_str!("../web/ops.html");
 const WEB_STYLES_CSS: &str = include_str!("../web/styles.css");
 const WEB_APP_JS: &str = include_str!("../web/app.js");
 const INSTALL_SH: &str = include_str!("../../../deploy/install.sh");
+const INSTALL_PS1: &str = include_str!("../../../deploy/install.ps1");
 const JOIN_MD: &str = include_str!("../../../docs/JOIN.md");
 const SKILL_ROUTER_MD: &str = include_str!("../../../skills/quod/SKILL.md");
 const SKILL_WORKER_MD: &str = include_str!("../../../skills/quod-worker/SKILL.md");
@@ -334,9 +335,17 @@ async fn web_install_sh() -> impl IntoResponse {
     )
 }
 
+async fn web_install_ps1() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        INSTALL_PS1,
+    )
+}
+
 async fn api_skills_index() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "install_script": "/install.sh",
+        "install_script_ps1": "/install.ps1",
         "cli_command": "quod skill <router|worker|orchestrator|auditor|blueprinter>",
         "skills": {
             "router": "/skills/quod/SKILL.md",
@@ -907,6 +916,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/assets/styles.css", get(web_styles))
         .route("/assets/app.js", get(web_app_js))
         .route("/install.sh", get(web_install_sh))
+        .route("/install.ps1", get(web_install_ps1))
         .route("/JOIN.md", get(web_join_md))
         .route("/JOIN.txt", get(web_join_txt))
         .route("/skills", get(api_skills_index))
@@ -2077,6 +2087,22 @@ mod tests {
         .unwrap();
         assert!(inst_text.starts_with("#!/usr/bin/env bash"));
 
+        let ps_resp = app
+            .clone()
+            .oneshot(Request::get("/install.ps1").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(ps_resp.status(), StatusCode::OK);
+        let ps_text = String::from_utf8(
+            axum::body::to_bytes(ps_resp.into_body(), 64 * 1024)
+                .await
+                .unwrap()
+                .to_vec(),
+        )
+        .unwrap();
+        assert!(ps_text.contains("quod-$Target.zip"));
+        assert!(ps_text.contains("x86_64-pc-windows-msvc"));
+
         let skills_idx = app
             .clone()
             .oneshot(Request::get("/skills").body(Body::empty()).unwrap())
@@ -2088,6 +2114,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(skills_json["install_script"], "/install.sh");
+        assert_eq!(skills_json["install_script_ps1"], "/install.ps1");
 
         for skill_path in [
             "/skills/quod-worker/SKILL.md",

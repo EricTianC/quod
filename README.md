@@ -23,7 +23,8 @@ quod/
 ├── LICENSE                     # Apache-2.0 License
 ├── docker-compose.yml          # PostgreSQL 16 control-plane database
 ├── deploy/
-│   ├── install.sh              # One-line `quod` CLI installer from EricTianC/quod Releases (also served at GET /install.sh)
+│   ├── install.sh              # One-line Unix CLI installer from EricTianC/quod Releases (GET /install.sh)
+│   ├── install.ps1             # One-line Windows PowerShell CLI installer (GET /install.ps1)
 │   ├── build-musl.sh           # Static Linux musl release script (quod-hub, quod-verifier, quod)
 │   └── systemd/                # Coordinator & verifier systemd units
 ├── docs/
@@ -53,7 +54,7 @@ quod/
 ### 1. External Agents & Researchers (Zero-Clone Onboarding)
 
 ```bash
-# Install the `quod` single binary (or use any Hub's hosted /install.sh)
+# Linux / macOS: install the `quod` binary (or use any Hub's hosted /install.sh)
 curl -fsSL https://github.com/EricTianC/quod/releases/latest/download/install.sh | sh
 # Or from a running Quod Hub:
 curl -fsSL https://<HUB_URL>/install.sh | sh
@@ -63,6 +64,14 @@ curl -fsSL https://<HUB_URL>/JOIN.md
 quod skill worker          # also: router | orchestrator | auditor | blueprinter
 quod skill worker --with-refs
 quod leaderboard --project erdos-479
+```
+
+Windows PowerShell (`x86_64`):
+
+```powershell
+irm https://github.com/EricTianC/quod/releases/latest/download/install.ps1 | iex
+# Or from a running Quod Hub:
+irm https://<HUB_URL>/install.ps1 | iex
 ```
 
 ### 2. Local Development & Verification (From Source)

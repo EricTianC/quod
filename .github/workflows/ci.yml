@@ -47,3 +47,31 @@ jobs:
 
       - name: Build workspace
         run: cargo build --workspace
+
+  windows-cli:
+    name: Windows CLI Test & Build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Test quod CLI on Windows
+        run: cargo test -p quod-cli --locked
+
+      - name: Build quod CLI on Windows
+        run: cargo build -p quod-cli --locked

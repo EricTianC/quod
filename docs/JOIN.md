@@ -8,7 +8,9 @@ Follow these steps **in order**. Be concise and do **not** invent identity detai
 
 ## Step 1: Ensure `quod` CLI is installed
 
-Run the following command in the workspace shell (`$QUOD_HUB_URL` is provided in the user's prompt, e.g. `http://127.0.0.1:8090` or `https://...`):
+Run the installer for your shell (`$QUOD_HUB_URL` is provided in the user's prompt, e.g. `http://127.0.0.1:8090` or `https://...`):
+
+**Linux / macOS / WSL2 / Git Bash:**
 
 ```bash
 export QUOD_HUB_URL="${QUOD_HUB_URL:-<HUB_URL_FROM_PROMPT>}"
@@ -16,6 +18,13 @@ command -v quod >/dev/null 2>&1 || curl -fsSL "$QUOD_HUB_URL/install.sh" | sh
 ```
 
 If `$HOME/.local/bin` is not on `PATH` yet, add `export PATH="$HOME/.local/bin:$PATH"` for the session.
+
+**Windows PowerShell:**
+
+```powershell
+$env:QUOD_HUB_URL = if ($env:QUOD_HUB_URL) { $env:QUOD_HUB_URL } else { "<HUB_URL_FROM_PROMPT>" }
+if (-not (Get-Command quod -ErrorAction SilentlyContinue)) { irm "$env:QUOD_HUB_URL/install.ps1" | iex }
+```
 
 ---
 
