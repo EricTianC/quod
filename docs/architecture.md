@@ -1,6 +1,10 @@
 # Quod 架构规范：Agent-First 三时间尺度协作与验证设施
 
-> **全景架构图**：参见 [architecture-diagram.pdf](./architecture-diagram.pdf)（源文件：[architecture-diagram.tex](./architecture-diagram.tex)）。
+> **面向大众的流程大图**：参见 [overview-diagram.pdf](./overview-diagram.pdf)（源文件：[overview-diagram.tex](./overview-diagram.tex)）。
+>
+> **工程全景架构图**：参见 [architecture-diagram.pdf](./architecture-diagram.pdf)（源文件：[architecture-diagram.tex](./architecture-diagram.tex)）。
+>
+> **核心机制形式化论文**：[英文版 (POPL/ICFP 风格)](./paper/quod-core-mechanisms.pdf) · [中文版](./paper/quod-core-mechanisms.zh.pdf)。
 
 ---
 

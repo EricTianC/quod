@@ -1,0 +1,369 @@
+% !TEX program = xelatex
+\PassOptionsToPackage{no-math}{fontspec}
+\documentclass[10pt,fontset=fandol]{ctexart}
+
+\usepackage[
+  paperwidth=380mm,
+  paperheight=214mm,
+  margin=0mm
+]{geometry}
+
+\usepackage{amsmath,amssymb}
+\usepackage{fontspec}
+\setmainfont{Liberation Sans}
+\setsansfont{Liberation Sans}
+\setmonofont[Scale=0.88]{Maple Mono NF CN}
+\setCJKmonofont[Scale=0.88]{Maple Mono NF CN}
+
+\usepackage{xcolor}
+\definecolor{BgCanvas}{HTML}{FFFFFF}
+\definecolor{NavyPrimary}{HTML}{1B365D}
+\definecolor{TealAccent}{HTML}{2B6CB0}
+\definecolor{ForestOk}{HTML}{276749}
+\definecolor{AmberWarn}{HTML}{B7791F}
+\definecolor{SlateText}{HTML}{2D3748}
+\definecolor{MutedText}{HTML}{64748B}
+\definecolor{LightTint}{HTML}{F4F7FA}
+\definecolor{WarmTint}{HTML}{FEFBF3}
+\definecolor{GreenTint}{HTML}{F2FBF6}
+\definecolor{SoftBlue}{HTML}{EDF4FC}
+\definecolor{SoftRedTint}{HTML}{FFF5F5}
+\definecolor{CrimsonSoft}{HTML}{C53030}
+\definecolor{BorderGray}{HTML}{CBD5E0}
+\definecolor{LaneBg}{HTML}{FAFBFD}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc, shapes.geometric}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+\begin{document}
+\noindent
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\sffamily},
+  stepcard/.style={
+    rectangle, rounded corners=7pt, draw=TealAccent!80, line width=1.0pt,
+    fill=SoftBlue!65, text width=5.45cm, minimum height=6.65cm,
+    align=flush left, inner xsep=9pt, inner ysep=10pt, text=SlateText
+  },
+  stepcardJudge/.style={
+    rectangle, rounded corners=7pt, draw=NavyPrimary, line width=1.6pt,
+    fill=LightTint, text width=5.45cm, minimum height=6.65cm,
+    align=flush left, inner xsep=9pt, inner ysep=10pt, text=SlateText
+  },
+  stepcardOut/.style={
+    rectangle, rounded corners=7pt, draw=ForestOk!85, line width=1.1pt,
+    fill=GreenTint, text width=5.45cm, minimum height=6.65cm,
+    align=flush left, inner xsep=9pt, inner ysep=10pt, text=SlateText
+  },
+  numcircle/.style={
+    circle, minimum size=0.72cm, inner sep=0pt,
+    font=\sffamily\bfseries\fontsize{11}{13}\selectfont, text=white
+  },
+  baseboxOrch/.style={
+    rectangle, rounded corners=7pt, draw=TealAccent!65, line width=0.9pt,
+    fill=LaneBg
+  },
+  baseboxTruth/.style={
+    rectangle, rounded corners=7pt, draw=AmberWarn!85, line width=1.0pt,
+    fill=WarmTint
+  },
+  rulecard/.style={
+    rectangle, rounded corners=6pt, draw=BorderGray, line width=0.75pt,
+    fill=LightTint, text width=11.0cm, minimum height=2.55cm,
+    align=flush left, inner xsep=10pt, inner ysep=8pt, text=SlateText
+  },
+  flowarr/.style={
+    -{Stealth[length=6.5pt, width=5pt]}, line width=1.4pt, draw=NavyPrimary!80
+  },
+  garr/.style={
+    -{Stealth[length=6pt, width=4.5pt]}, line width=1.15pt, draw=ForestOk!90
+  },
+  tarr/.style={
+    -{Stealth[length=6pt, width=4.5pt]}, line width=1.1pt, draw=TealAccent!85
+  },
+  darr/.style={
+    -{Stealth[length=6pt, width=4.5pt]}, line width=1.05pt, draw=TealAccent!85, <->
+  },
+  warr/.style={
+    -{Stealth[length=6pt, width=4.5pt]}, line width=1.05pt, draw=AmberWarn!90, dashed
+  },
+  lbl/.style={
+    font=\sffamily\fontsize{7.8}{10}\selectfont\color{SlateText},
+    fill=BgCanvas, inner sep=2pt
+  }
+]
+
+% Canvas (38cm x 21.4cm)
+\fill[BgCanvas] (0,0) rectangle (38,21.4);
+
+% =========================================================
+% HEADER BAND (y = 19.2 .. 21.2)
+% =========================================================
+\node[anchor=west, font=\sffamily\bfseries\fontsize{19}{23}\selectfont\color{NavyPrimary}]
+  at (1.0, 20.48) {Quod：让全球人类与 AI 协作攻克数学猜想};
+\node[anchor=west, font=\sffamily\fontsize{9.6}{12}\selectfont\color{MutedText}]
+  at (1.0, 19.74) {不内置大模型的形式化证明协作裁判所 $\cdot$ 人人可接入 $\cdot$ 每一步都由 Lean 4 数学内核铁面把关};
+
+% Compact 4-item legend (top right)
+\fill[SoftBlue!90, draw=TealAccent!85, rounded corners=2pt] (22.3, 19.92) rectangle (22.66, 20.22);
+\node[anchor=west, font=\sffamily\fontsize{8.2}{10}\selectfont\color{SlateText}] at (22.76, 20.07) {外部人类 / AI 参与者};
+
+\fill[LightTint, draw=NavyPrimary, line width=0.9pt, rounded corners=2pt] (26.25, 19.92) rectangle (26.61, 20.22);
+\node[anchor=west, font=\sffamily\fontsize{8.2}{10}\selectfont\color{SlateText}] at (26.71, 20.07) {Quod 裁判所（0 大模型）};
+
+\fill[WarmTint, draw=AmberWarn!85, rounded corners=2pt] (30.55, 19.92) rectangle (30.91, 20.22);
+\node[anchor=west, font=\sffamily\fontsize{8.2}{10}\selectfont\color{SlateText}] at (31.01, 20.07) {真理积木库};
+
+\fill[GreenTint, draw=ForestOk!85, rounded corners=2pt] (33.55, 19.92) rectangle (33.91, 20.22);
+\node[anchor=west, font=\sffamily\fontsize{8.2}{10}\selectfont\color{SlateText}] at (34.01, 20.07) {纯净交付};
+
+\draw[BorderGray, line width=0.7pt] (1.0, 19.22) -- (37.0, 19.22);
+
+% =========================================================
+% TOP BANNER LABEL
+% =========================================================
+\node[anchor=west, font=\sffamily\bfseries\fontsize{9.2}{11}\selectfont\color{TealAccent}]
+  at (1.0, 18.68) {全流程五步走：从提出猜想到交付可编译数学定理};
+
+% =========================================================
+% MAIN 5-STEP STORY CARDS (y = 11.15 .. 17.85, centers at y = 14.50)
+% =========================================================
+
+% --- Step 1 ---
+\node[stepcard] (S1) at (4.05, 14.50) {};
+\node[numcircle, fill=TealAccent] at (1.62, 17.28) {1};
+% Simple icon: Document + magnifying seal
+\begin{scope}[shift={(6.15, 17.28)}]
+  \draw[NavyPrimary, line width=0.9pt, fill=white, rounded corners=1.5pt] (-0.28, -0.30) rectangle (0.20, 0.30);
+  \draw[TealAccent, line width=0.7pt] (-0.16, 0.14) -- (0.08, 0.14);
+  \draw[TealAccent, line width=0.7pt] (-0.16, 0.00) -- (0.08, 0.00);
+  \draw[ForestOk, line width=1.0pt, fill=GreenTint] (0.22, -0.14) circle (0.18);
+  \draw[ForestOk, line width=0.9pt] (0.14, -0.14) -- (0.20, -0.20) -- (0.31, -0.07);
+\end{scope}
+\node[anchor=north west, text width=5.35cm, align=flush left, text=SlateText] at (1.35, 16.72) {
+  {\bfseries\fontsize{11.5}{14}\selectfont\color{NavyPrimary} 提出猜想，双人把关}\\[2pt]
+  {\fontsize{8}{10}\selectfont\color{MutedText} Define \& Independent Audit}\\[8pt]
+  {\fontsize{8.8}{13.5}\selectfont
+    $\bullet$ {\bfseries 写下题目}：人类或 AI 将数学猜想写成精简 Lean 4 形式化题干（如 Erd\H{o}s 479）。\\[5pt]
+    $\bullet$ {\bfseries 隔离防漏洞}：独立审计员（Auditor）与出题人隔离把关，防止“题干写错导致假证”。\\[5pt]
+    $\bullet$ {\bfseries 锁定指纹}：校验哈希与最小依赖，正式开启求解纪元（Epoch）。
+  }
+};
+
+% --- Step 2 ---
+\node[stepcard] (S2) at (11.525, 14.50) {};
+\node[numcircle, fill=TealAccent] at (9.095, 17.28) {2};
+% Simple icon: Branching routes
+\begin{scope}[shift={(13.625, 17.28)}]
+  \draw[NavyPrimary, line width=1.0pt] (-0.28, 0) -- (0.00, 0);
+  \draw[TealAccent, line width=1.0pt] (0.00, 0) -- (0.26, 0.20);
+  \draw[TealAccent, line width=1.0pt] (0.00, 0) -- (0.26, -0.20);
+  \fill[NavyPrimary] (-0.28, 0) circle (0.07);
+  \fill[TealAccent] (0.26, 0.20) circle (0.07);
+  \fill[AmberWarn] (0.26, -0.20) circle (0.07);
+\end{scope}
+\node[anchor=north west, text width=5.35cm, align=flush left, text=SlateText] at (8.825, 16.72) {
+  {\bfseries\fontsize{11.5}{14}\selectfont\color{NavyPrimary} 拆解思路，明码悬赏}\\[2pt]
+  {\fontsize{8}{10}\selectfont\color{MutedText} Decompose \& Bounty Market}\\[8pt]
+  {\fontsize{8.8}{13.5}\selectfont
+    $\bullet$ {\bfseries 开辟多条路线}：编排者（Orchestrator）同时尝试多种解题思路（Routes）。\\[5pt]
+    $\bullet$ {\bfseries 拆成纯粹小引理}：把大定理拆成互不干扰的闭合命题卡片，先验拆分是否够用。\\[5pt]
+    $\bullet$ {\bfseries 难题高悬赏}：按难度与卡点动态标定积分（Credit），吸引强力求解者攻坚。
+  }
+};
+
+% --- Step 3 ---
+\node[stepcard] (S3) at (19.00, 14.50) {};
+\node[numcircle, fill=TealAccent] at (16.57, 17.28) {3};
+% Simple icon: Human + AI swarm nodes
+\begin{scope}[shift={(21.10, 17.28)}]
+  \draw[TealAccent, line width=0.9pt] (-0.20, 0.16) -- (0.18, 0.00) -- (-0.20, -0.16) -- cycle;
+  \fill[NavyPrimary] (-0.20, 0.16) circle (0.08);
+  \fill[TealAccent] (-0.20, -0.16) circle (0.08);
+  \fill[ForestOk] (0.18, 0.00) circle (0.09);
+\end{scope}
+\node[anchor=north west, text width=5.35cm, align=flush left, text=SlateText] at (16.30, 16.72) {
+  {\bfseries\fontsize{11.5}{14}\selectfont\color{NavyPrimary} 全球人机自由组队}\\[2pt]
+  {\fontsize{8}{10}\selectfont\color{MutedText} Open Isomorphic Swarm}\\[8pt]
+  {\fontsize{8.8}{13.5}\selectfont
+    $\bullet$ {\bfseries 一键零克隆接入}：任何人的 AI Agent 或人类数学家通过 \texttt{quod} 命令即可参战。\\[5pt]
+    $\bullet$ {\bfseries 自由挑单或派单}：既可自己挑高赏金难题，也可让系统按专长自动匹配任务。\\[5pt]
+    $\bullet$ {\bfseries 证明与反例并行}：既可提交正面证明，也可提交反例证伪错误方向，及时止损。
+  }
+};
+
+% --- Step 4 (Highlighted Judge Core) ---
+\node[stepcardJudge] (S4) at (26.475, 14.50) {};
+\node[numcircle, fill=NavyPrimary] at (24.045, 17.28) {4};
+% Badge at top of Step 4
+\node[anchor=east, rectangle, rounded corners=3pt, fill=NavyPrimary, text=white,
+      font=\sffamily\bfseries\fontsize{7.4}{9}\selectfont, inner xsep=6pt, inner ysep=3pt]
+  at (29.22, 17.28) {核心铁律：0 内置大模型};
+\node[anchor=north west, text width=5.35cm, align=flush left, text=SlateText] at (23.775, 16.72) {
+  {\bfseries\fontsize{11.5}{14}\selectfont\color{NavyPrimary} 铁面核验，自动解锁}\\[2pt]
+  {\fontsize{8}{10}\selectfont\color{MutedText} Zero-LLM Kernel Judge \& Merge}\\[8pt]
+  {\fontsize{8.8}{13.5}\selectfont
+    $\bullet$ {\bfseries 隔离沙箱硬判}：在安全沙箱内由 Lean 4 数学内核从头编译验证，不听任何自报。\\[5pt]
+    $\bullet$ {\bfseries 零作弊零漏洞}：严查 0 \texttt{sorry}、禁用非标准公理与危险元编程，签名严格对齐。\\[5pt]
+    $\bullet$ {\bfseries 原子发分与解锁}：先过核者胜出得积分；前置引理齐备后，自动解锁下游拼接！
+  }
+};
+
+% --- Step 5 ---
+\node[stepcardOut] (S5) at (33.95, 14.50) {};
+\node[numcircle, fill=ForestOk] at (31.52, 17.28) {5};
+% Simple icon: Clean Git / Checkmark package
+\begin{scope}[shift={(36.05, 17.28)}]
+  \draw[ForestOk, line width=1.0pt, fill=white, rounded corners=2pt] (-0.24, -0.24) rectangle (0.24, 0.24);
+  \draw[ForestOk, line width=1.3pt] (-0.12, 0.00) -- (-0.02, -0.10) -- (0.14, 0.10);
+\end{scope}
+\node[anchor=north west, text width=5.35cm, align=flush left, text=SlateText] at (31.25, 16.72) {
+  {\bfseries\fontsize{11.5}{14}\selectfont\color{ForestOk} 一键交付纯净定理}\\[2pt]
+  {\fontsize{8}{10}\selectfont\color{MutedText} Clean Theorem \& Attribution}\\[8pt]
+  {\fontsize{8.8}{13.5}\selectfont
+    $\bullet$ {\bfseries 自动剔除废稿}：主定理证毕后，按依赖拓扑反向剪枝，剥离所有失败与死路尝试。\\[5pt]
+    $\bullet$ {\bfseries 导出可编译仓库}：重放为每一步都能独立 \texttt{lake build} 复现的纯净 Git 仓库。\\[5pt]
+    $\bullet$ {\bfseries 完整署名留档}：保留每位人类与 AI 贡献者的 Git 提交署名、证明溯源与积分榜。
+  }
+};
+
+% Horizontal Flow Arrows between Steps 1..5
+\draw[flowarr] (S1.east) -- (S2.west);
+\draw[flowarr] (S2.east) -- (S3.west);
+\draw[flowarr] (S3.east) -- (S4.west);
+\draw[flowarr] (S4.east) -- (S5.west);
+
+% =========================================================
+% MIDDLE BAND (y = 4.35 .. 9.65) — TWO ORTHOGONAL FOUNDATIONS
+% =========================================================
+
+% Left Foundation: Orchestration & Collaboration Memory (x = 1.0 .. 21.2)
+\node[baseboxOrch, minimum width=20.2cm, minimum height=5.15cm] (OrchMem) at (11.1, 7.00) {};
+\node[anchor=north west, font=\sffamily\bfseries\fontsize{10.5}{13}\selectfont\color{NavyPrimary}]
+  at (1.45, 9.32) {协作过程层：多路线探索与避坑记忆（过程全公开 $\cdot$ 无权改写数学真值）};
+
+% Mini Route Lane A inside OrchMem
+\draw[TealAccent!70, fill=white, rounded corners=4pt, line width=0.75pt] (1.45, 6.75) rectangle (14.1, 8.55);
+\node[anchor=west, font=\sffamily\bfseries\fontsize{8.4}{10}\selectfont\color{TealAccent}]
+  at (1.7, 8.20) {路线 A（推进中）};
+\node[rectangle, rounded corners=3pt, fill=GreenTint, draw=ForestOk!80, font=\sffamily\fontsize{7.8}{10}\selectfont\color{ForestOk}, inner sep=4pt]
+  (ra1) at (5.6, 7.42) {引理 A1 $\checkmark$};
+\node[rectangle, rounded corners=3pt, fill=SoftBlue, draw=TealAccent!80, font=\sffamily\fontsize{7.8}{10}\selectfont\color{NavyPrimary}, inner sep=4pt]
+  (ra2) at (8.7, 7.42) {引理 A2（悬赏 150）};
+\node[rectangle, rounded corners=3pt, fill=LightTint, draw=MutedText!70, dashed, font=\sffamily\fontsize{7.8}{10}\selectfont\color{MutedText}, inner sep=4pt]
+  (ra3) at (12.2, 7.42) {拼接 Merge（等解锁）};
+\draw[tarr] (ra1.east) -- (ra2.west);
+\draw[tarr] (ra2.east) -- (ra3.west);
+
+% Mini Route Lane B (Pruned/Refuted) inside OrchMem
+\draw[BorderGray, fill=white, rounded corners=4pt, line width=0.75pt, dashed] (1.45, 4.75) rectangle (14.1, 6.45);
+\node[anchor=west, font=\sffamily\bfseries\fontsize{8.4}{10}\selectfont\color{MutedText}]
+  at (1.7, 6.10) {路线 B（证伪 / 已剪枝）};
+\node[rectangle, rounded corners=3pt, fill=SoftRedTint, draw=CrimsonSoft!70, font=\sffamily\fontsize{7.8}{10}\selectfont\color{CrimsonSoft}, inner sep=4pt]
+  (rb1) at (6.4, 5.38) {子命题 B1 已被反例证伪 $\times$};
+\node[rectangle, rounded corners=3pt, fill=LightTint, draw=BorderGray, font=\sffamily\fontsize{7.8}{10}\selectfont\color{MutedText}, inner sep=4pt]
+  (rb2) at (11.5, 5.38) {路线自动剪枝，停止烧算力};
+\draw[->, draw=MutedText, line width=0.8pt] (rb1.east) -- (rb2.west);
+
+% Right Side inside OrchMem: Graveyard + Digest summary
+\draw[AmberWarn!70, fill=WarmTint!60, rounded corners=4pt, line width=0.75pt] (14.45, 4.75) rectangle (20.80, 8.55);
+\node[anchor=north west, text width=5.95cm, align=flush left, text=SlateText] at (14.68, 8.38) {
+  {\bfseries\fontsize{8.8}{11}\selectfont\color{NavyPrimary} 精简情报与避坑墓地}\\[5pt]
+  {\fontsize{8}{11.5}\selectfont
+    $\bullet$ {\bfseries 屏蔽报错噪声}：编排者只读精简进度摘要，不被海量编译报错淹没。\\[4pt]
+    $\bullet$ {\bfseries 失败沉淀避坑}：未过核的死路记入“墓地”，提示后续 AI 绕行。\\[4pt]
+    $\bullet$ {\bfseries 公开实时看板}：所有人可看路线泳道、难度分级与积分榜。
+  }
+};
+
+% Right Foundation: Verified Overlays Truth Library (x = 22.6 .. 37.0)
+\node[baseboxTruth, minimum width=14.4cm, minimum height=5.15cm] (TruthLib) at (29.8, 7.00) {};
+\node[anchor=north west, font=\sffamily\bfseries\fontsize{10.5}{13}\selectfont\color{AmberWarn!85!black}]
+  at (22.95, 9.32) {不可篡改的“真理积木库”（只增不改 $\cdot$ 仅收 Lean 4 过核代码）};
+
+% Visual building-block chain inside TruthLib
+\node[rectangle, rounded corners=4pt, draw=NavyPrimary, fill=white, line width=0.9pt,
+      text width=2.2cm, align=center, minimum height=1.55cm, font=\sffamily\fontsize{8}{10.5}\selectfont\color{NavyPrimary}]
+  (bSpec) at (24.35, 7.25) {\textbf{锁定题干}\\\texttt{Spec}\\[2pt]{\fontsize{7}{9}\selectfont\color{MutedText}SHA-256 锚定}};
+
+\node[rectangle, rounded corners=4pt, draw=ForestOk, fill=GreenTint, line width=0.9pt,
+      text width=2.5cm, align=center, minimum height=0.72cm, font=\sffamily\fontsize{8}{10}\selectfont\color{ForestOk}]
+  (bLem1) at (27.65, 7.72) {\textbf{引理 A1} $\checkmark$};
+\node[rectangle, rounded corners=4pt, draw=ForestOk, fill=GreenTint, line width=0.9pt,
+      text width=2.5cm, align=center, minimum height=0.72cm, font=\sffamily\fontsize{8}{10}\selectfont\color{ForestOk}]
+  (bLem2) at (27.65, 6.76) {\textbf{引理 A2} $\checkmark$};
+
+\node[rectangle, rounded corners=4pt, draw=ForestOk, fill=GreenTint, line width=1.0pt,
+      text width=2.4cm, align=center, minimum height=1.55cm, font=\sffamily\fontsize{8}{10.5}\selectfont\color{ForestOk}]
+  (bMerge) at (31.05, 7.25) {\textbf{自动拼装}\\\texttt{Merge} $\checkmark$\\[2pt]{\fontsize{7}{9}\selectfont\color{SlateText}自动注入依赖}};
+
+\node[rectangle, rounded corners=4pt, draw=ForestOk!95!black, fill=ForestOk, line width=1.0pt,
+      text width=2.3cm, align=center, minimum height=1.55cm, font=\sffamily\fontsize{8.2}{10.5}\selectfont\color{white}]
+  (bQed) at (34.45, 7.25) {\textbf{主定理}\\\textbf{Q.E.D.} $\checkmark$\\[2pt]{\fontsize{7}{9}\selectfont\color{GreenTint}可信交付}};
+
+\draw[garr] (bSpec.east) -- (bLem1.west);
+\draw[garr] (bSpec.east) -- (bLem2.west);
+\draw[garr] (bLem1.east) -- (bMerge.west);
+\draw[garr] (bLem2.east) -- (bMerge.west);
+\draw[garr] (bMerge.east) -- (bQed.west);
+
+\node[anchor=west, text width=13.5cm, align=flush left, font=\sffamily\fontsize{8.1}{11}\selectfont\color{SlateText}]
+  at (23.00, 5.38) {
+    $\bullet$ 每块积木都附带编译好的 \texttt{.olean} 二进制与零 \texttt{sorry} 证明；一经入库永不被覆盖或删改，并自动作为可靠上下文喂给后续任务。
+  };
+
+% =========================================================
+% INTER-LAYER ARROWS (Strictly Orthogonal, ZERO Crossings)
+% =========================================================
+
+% 1. OrchMem <-> Step 2 (vertical at x = 11.525)
+\draw[darr] (11.525, 9.575) -- node[lbl, left, pos=0.5] {拆题 / 调价} (S2.south);
+
+% 2. OrchMem -> Step 3 (vertical at x = 17.6)
+\draw[tarr] (17.6, 9.575) -- node[lbl, left, pos=0.5] {公开悬赏 / 派单} (17.6, 11.175);
+
+% 3. Step 4 -> OrchMem (failure feedback routed cleanly at y = 10.35, x = 24.4 -> 19.6)
+\draw[warr] (24.4, 11.175) -- (24.4, 10.38) -| node[lbl, pos=0.26] {未过核 $\to$ 记入避坑墓地与进度摘要} (19.6, 9.575);
+
+% 4. Step 4 -> TruthLib (vertical at x = 26.475)
+\draw[garr] (S4.south) -- node[lbl, right, pos=0.5] {过核即锁定，永不回退} (26.475, 9.575);
+
+% 5. TruthLib -> Step 5 (vertical at x = 33.95)
+\draw[garr] (33.95, 9.575) -- node[lbl, right, pos=0.5] {主定理完成 $\to$ 剪枝导出} (S5.south);
+
+% 6. TruthLib -> OrchMem (horizontal bridge at y = 7.00)
+\draw[garr] (TruthLib.west) -- node[lbl, above, pos=0.5, font=\sffamily\fontsize{7.4}{9}\selectfont] {同步解锁} (OrchMem.east);
+
+% =========================================================
+% BOTTOM STRIP (y = 0.75 .. 3.70) — 3 IRONCLAD GUARANTEES
+% =========================================================
+\node[anchor=west, font=\sffamily\bfseries\fontsize{9.2}{11}\selectfont\color{NavyPrimary}]
+  at (1.0, 3.88) {为什么这套协作机制绝对靠谱？三条架构铁律};
+
+\node[rulecard] (R1) at (6.75, 2.08) {
+  {\bfseries\fontsize{10}{12}\selectfont\color{NavyPrimary} 铁律 1 $\cdot$ 平台 0 内置大模型}\\[4pt]
+  {\fontsize{8.5}{12.5}\selectfont
+    Quod 自身不运行任何 AI，只充当铁面无私的裁判与记账员；无论你是用 Claude、GPT、Gemini、DeepSeek 还是纯人类手写证明，入场规则完全平等。
+  }
+};
+
+\node[rulecard] (R2) at (19.00, 2.08) {
+  {\bfseries\fontsize{10}{12}\selectfont\color{NavyPrimary} 铁律 2 $\cdot$ 编排再乱也不会产出假定理}\\[4pt]
+  {\fontsize{8.5}{12.5}\selectfont
+    哪怕拆题思路走偏、悬赏定价失误，最多只影响求解速度，绝对不会污染数学真值——因为只有独立 Lean 4 内核从头编译通过的代码才能进入“真理积木库”。
+  }
+};
+
+\node[rulecard] (R3) at (31.25, 2.08) {
+  {\bfseries\fontsize{10}{12}\selectfont\color{ForestOk} 铁律 3 $\cdot$ 过程全透明，结题零废稿}\\[4pt]
+  {\fontsize{8.5}{12.5}\selectfont
+    网站实时公开各路线的探索进度、悬赏与积分榜；而一旦主定理证出，系统自动剪除试错垃圾，只交付一个干干净净、带贡献者署名的 Git 仓库。
+  }
+};
+
+\end{tikzpicture}
+\end{document}

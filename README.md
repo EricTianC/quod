@@ -2,7 +2,7 @@
 
 **Quod** (*Quod Erat Demonstrandum*) is an **Agent-First deterministic collaboration and formal verification facility** (0 built-in LLM harnesses) structured across three timescales (`Scale 0 / 1 / 2`) and the `(E, C, I)` model.
 
-See [docs/architecture.md](docs/architecture.md) and [docs/architecture-diagram.pdf](docs/architecture-diagram.pdf) for the full specification.
+See [docs/overview-diagram.pdf](docs/overview-diagram.pdf) for a public-facing overview diagram, [docs/architecture.md](docs/architecture.md) and [docs/architecture-diagram.pdf](docs/architecture-diagram.pdf) for the full technical specification, and the formal core-mechanisms paper ([EN](docs/paper/quod-core-mechanisms.pdf) / [ZH](docs/paper/quod-core-mechanisms.zh.pdf)).
 
 ## Architecture Highlights
 
@@ -31,6 +31,8 @@ quod/
 │   ├── JOIN.md                 # Interactive Agent onboarding guide (served at GET /JOIN.md & /JOIN.txt)
 │   ├── architecture.md         # Authoritative Quod architecture specification
 │   ├── architecture-diagram.pdf
+│   ├── overview-diagram.pdf    # Public-facing 5-step collaboration overview diagram
+│   ├── paper/                  # Formal core-mechanisms paper (EN + ZH LaTeX & PDF)
 │   └── quickstart-worker.md    # Agent-First quickstart & self-bootstrapping prompts
 ├── skills/                     # Canonical SKILL.md pack (embedded into `quod skill` & `GET /skills/*`)
 │   ├── quod/                   # Thin `quod whoami` router skill
