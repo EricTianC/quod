@@ -3,17 +3,19 @@
 //! persists verified `.olean` overlay modules into `accepted_olean/<project_id>/epoch_<epoch_id>/`,
 //! and unlocks downstream `Blocked` tasks (such as `Merge` tasks).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use clap::ValueEnum;
 use quod_core::{AuditVerdict, SubmissionKind};
 use quod_sandbox::{
     BwrapConfig, BwrapRunner, HarnessSpec, LocalLeanRunner, LocalVerifyRequest, SandboxRequest,
-    SandboxRunner, check_stage0, parse_audit_json, render_audit_harness, sha256_hex, Stage0Policy,
+    SandboxRunner, Stage0Policy, check_stage0, join_lean_paths, module_olean_path,
+    parse_audit_json, render_audit_harness, sha256_hex,
 };
 use quod_store::{BlobStore, QuodStore, VerificationOutcomeInput};
 use tracing::{info, warn};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum RunnerMode {
@@ -48,6 +50,189 @@ impl Default for VerifierConfig {
     }
 }
 
+fn dir_has_direct_olean(dir: &Path) -> bool {
+    std::fs::read_dir(dir).is_ok_and(|entries| {
+        entries
+            .filter_map(|e| e.ok().map(|ent| ent.path()))
+            .any(|p| p.is_file() && p.extension().is_some_and(|ext| ext == "olean"))
+    })
+}
+
+fn dir_contains_package_olean(dir: &Path) -> bool {
+    dir_has_direct_olean(dir)
+        || std::fs::read_dir(dir).is_ok_and(|entries| {
+            entries
+                .filter_map(|e| e.ok().map(|ent| ent.path()))
+                .any(|p| p.is_dir() && dir_has_direct_olean(&p))
+        })
+}
+
+/// Expands Lean search root directories to also include immediate package subdirectories
+/// (e.g. `/opt/quod/epoch_lib/mathlib`, `/opt/quod/epoch_lib/aesop`) that hold `.olean` artifacts.
+pub fn expand_lean_search_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+        if !out.contains(root) {
+            out.push(root.clone());
+        }
+        if let Ok(entries) = std::fs::read_dir(root) {
+            let mut children: Vec<PathBuf> = entries
+                .filter_map(|e| e.ok().map(|ent| ent.path()))
+                .filter(|p| p.is_dir() && dir_contains_package_olean(p))
+                .collect();
+            children.sort();
+            for child in children {
+                if !out.contains(&child) {
+                    out.push(child);
+                }
+            }
+        }
+    }
+    out
+}
+
+fn persist_olean_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let tmp_dest = dest.with_extension(format!("olean.tmp.{}", Uuid::now_v7().simple()));
+    std::fs::copy(src, &tmp_dest)?;
+    std::fs::rename(&tmp_dest, dest)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn ensure_spec_olean(
+    store: &Arc<dyn QuodStore>,
+    blobs: &Arc<dyn BlobStore>,
+    cfg: &VerifierConfig,
+    toolchain_dir: &Path,
+    base_lean_paths: &[PathBuf],
+    epoch_accepted_dir: &Path,
+    project_id: &str,
+    epoch_id: u32,
+    spec_module: &str,
+) -> anyhow::Result<bool> {
+    if spec_module.is_empty() {
+        return Ok(false);
+    }
+    let dest = module_olean_path(epoch_accepted_dir, spec_module);
+    if dest.exists() || base_lean_paths.iter().any(|p| module_olean_path(p, spec_module).exists()) {
+        return Ok(true);
+    }
+
+    let spec_src = if let Some(raw_or_sha) = store
+        .get_overlay_blob(project_id, epoch_id, spec_module)
+        .await?
+    {
+        if raw_or_sha.len() == 64 && raw_or_sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+            match blobs.get_bytes(&raw_or_sha) {
+                Ok(bytes) => Some(String::from_utf8(bytes)?),
+                Err(_) => cfg
+                    .spec_file
+                    .as_deref()
+                    .filter(|p| p.exists())
+                    .map(std::fs::read_to_string)
+                    .transpose()?,
+            }
+        } else {
+            Some(raw_or_sha)
+        }
+    } else if let Some(spec_path) = &cfg.spec_file {
+        if spec_path.exists() {
+            Some(std::fs::read_to_string(spec_path)?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let Some(code) = spec_src else {
+        return Ok(false);
+    };
+
+    let tmp = tempfile::tempdir()?;
+    let spec_file = tmp.path().join("Spec.lean");
+    std::fs::write(&spec_file, &code)?;
+
+    match cfg.runner_mode {
+        RunnerMode::Bwrap => {
+            let staging_dir = tmp.path().join("build");
+            std::fs::create_dir_all(&staging_dir)?;
+            let runner = BwrapRunner::new(BwrapConfig {
+                toolchain_dir: toolchain_dir.to_path_buf(),
+                epoch_lean_paths: base_lean_paths.to_vec(),
+                accepted_olean_dir: Some(epoch_accepted_dir.to_path_buf()),
+                output_olean_dir: Some(staging_dir.clone()),
+                ..Default::default()
+            });
+            let outcome = runner
+                .run(SandboxRequest {
+                    task_id: format!("spec-epoch-{epoch_id}"),
+                    candidate_module: spec_module.to_string(),
+                    submission_file: spec_file,
+                    timeout_secs: cfg.timeout_secs,
+                    skip_harness: true,
+                })
+                .await?;
+            if outcome.exit_code != 0 {
+                anyhow::bail!(
+                    "failed to compile Spec module '{spec_module}' in bwrap (exit={}): {}{}",
+                    outcome.exit_code,
+                    outcome.stdout,
+                    outcome.stderr
+                );
+            }
+            let staged = module_olean_path(&staging_dir, spec_module);
+            if !staged.exists() {
+                anyhow::bail!(
+                    "Spec compilation exited 0 but staged .olean missing at {}",
+                    staged.display()
+                );
+            }
+            persist_olean_file(&staged, &dest)?;
+        }
+        RunnerMode::Local => {
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let tmp_dest = dest.with_extension(format!("olean.tmp.{}", Uuid::now_v7().simple()));
+            let mut search_paths = base_lean_paths.to_vec();
+            search_paths.push(epoch_accepted_dir.to_path_buf());
+            let lean_path_env = join_lean_paths(&search_paths);
+
+            let mut cmd = tokio::process::Command::new(&cfg.lean_bin);
+            cmd.current_dir(tmp.path())
+                .arg("-o")
+                .arg(&tmp_dest)
+                .arg(&spec_file)
+                .env("LEAN_PATH", &lean_path_env)
+                .kill_on_drop(true);
+            let output = tokio::time::timeout(
+                std::time::Duration::from_secs(cfg.timeout_secs.max(1)),
+                cmd.output(),
+            )
+            .await??;
+            if !output.status.success() {
+                let _ = std::fs::remove_file(&tmp_dest);
+                anyhow::bail!(
+                    "failed to compile Spec module '{spec_module}' locally: {}{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            std::fs::rename(&tmp_dest, &dest)?;
+        }
+    }
+
+    info!(project_id, epoch_id, spec_module, "compiled and cached epoch Spec.olean");
+    Ok(true)
+}
+
 /// Claims and processes at most one pending `VerificationJob`. Returns `Ok(true)` if a job ran.
 pub async fn process_one_job(
     store: &Arc<dyn QuodStore>,
@@ -68,29 +253,40 @@ pub async fn process_one_job(
         .join(format!("epoch_{}", job.epoch_id));
     std::fs::create_dir_all(&epoch_accepted_dir)?;
 
-    let mut lean_paths: Vec<PathBuf> = Vec::new();
+    let mut raw_roots: Vec<PathBuf> = Vec::new();
     if let Some(b) = &bundle {
         for p in &b.lean_paths {
             let pb = PathBuf::from(p);
-            if pb.exists() && !lean_paths.contains(&pb) {
-                lean_paths.push(pb);
+            if !raw_roots.contains(&pb) {
+                raw_roots.push(pb);
             }
         }
     }
     for p in &cfg.epoch_lean_paths {
-        if p.exists() && !lean_paths.contains(p) {
-            lean_paths.push(p.clone());
+        if !raw_roots.contains(p) {
+            raw_roots.push(p.clone());
         }
     }
-    if epoch_accepted_dir.exists() {
-        lean_paths.push(epoch_accepted_dir.clone());
-    }
+    let base_lean_paths = expand_lean_search_paths(&raw_roots);
 
     let toolchain_dir = bundle
         .as_ref()
         .map(|b| PathBuf::from(&b.toolchain_dir))
         .filter(|p| p.exists())
         .unwrap_or_else(|| cfg.toolchain_dir.clone());
+
+    let spec_olean_ready = ensure_spec_olean(
+        store,
+        blobs,
+        cfg,
+        &toolchain_dir,
+        &base_lean_paths,
+        &epoch_accepted_dir,
+        &job.project_id,
+        job.epoch_id,
+        &job.spec_module,
+    )
+    .await?;
 
     let extra_imports: Vec<String> = job
         .curated_imports
@@ -106,6 +302,10 @@ pub async fn process_one_job(
 
     let verdict = match cfg.runner_mode {
         RunnerMode::Local => {
+            let mut local_lean_paths = base_lean_paths;
+            if epoch_accepted_dir.exists() && !local_lean_paths.contains(&epoch_accepted_dir) {
+                local_lean_paths.push(epoch_accepted_dir.clone());
+            }
             let runner = LocalLeanRunner::new(&cfg.lean_bin);
             runner
                 .verify(&LocalVerifyRequest {
@@ -114,7 +314,11 @@ pub async fn process_one_job(
                     candidate_code: code,
                     candidate_module: job.candidate_module.clone(),
                     candidate_decl: job.candidate_decl.clone(),
-                    spec_file: cfg.spec_file.clone(),
+                    spec_file: if spec_olean_ready {
+                        None
+                    } else {
+                        cfg.spec_file.clone()
+                    },
                     spec_module: job.spec_module.clone(),
                     spec_decl: job.spec_decl.clone(),
                     inline_target_prop: if job.target_inline {
@@ -123,7 +327,7 @@ pub async fn process_one_job(
                         None
                     },
                     extra_imports,
-                    lean_paths,
+                    lean_paths: local_lean_paths,
                     expected_spec_sha256: None,
                     actual_spec_sha256: None,
                     timeout_secs: cfg.timeout_secs,
@@ -136,8 +340,9 @@ pub async fn process_one_job(
             run_bwrap_job(
                 cfg,
                 toolchain_dir,
-                lean_paths,
+                base_lean_paths,
                 epoch_accepted_dir,
+                persist_olean_dir,
                 &job.task_id,
                 job.kind,
                 &code,
@@ -191,6 +396,7 @@ async fn run_bwrap_job(
     toolchain_dir: PathBuf,
     epoch_lean_paths: Vec<PathBuf>,
     epoch_accepted_dir: PathBuf,
+    persist_olean_dir: Option<PathBuf>,
     task_id: &str,
     kind: SubmissionKind,
     code: &str,
@@ -218,6 +424,8 @@ async fn run_bwrap_job(
     }
 
     let tmp = tempfile::tempdir()?;
+    let staging_dir = tmp.path().join("build");
+    std::fs::create_dir_all(&staging_dir)?;
     let sub_file = tmp.path().join("submission.lean");
     let harness_file = tmp.path().join("AuditHarness.lean");
     std::fs::write(&sub_file, code)?;
@@ -240,6 +448,7 @@ async fn run_bwrap_job(
         toolchain_dir,
         epoch_lean_paths,
         accepted_olean_dir: Some(epoch_accepted_dir),
+        output_olean_dir: Some(staging_dir.clone()),
         harness_path: harness_file,
         ..Default::default()
     });
@@ -249,10 +458,12 @@ async fn run_bwrap_job(
             candidate_module: candidate_module.to_string(),
             submission_file: sub_file,
             timeout_secs: cfg.timeout_secs,
+            skip_harness: false,
         })
         .await?;
 
-    let ok = outcome.exit_code == 0 && parse_audit_json(&outcome.stdout);
+    let mut ok = outcome.exit_code == 0 && parse_audit_json(&outcome.stdout);
+    let mut exit_code = outcome.exit_code;
     let mut diagnostics = Vec::new();
     if !ok {
         for l in outcome.stdout.lines().chain(outcome.stderr.lines()) {
@@ -262,11 +473,24 @@ async fn run_bwrap_job(
             }
         }
         warn!(task_id, exit_code = outcome.exit_code, "bwrap verification failed");
+    } else if let Some(persist_dir) = persist_olean_dir {
+        let staged = module_olean_path(&staging_dir, candidate_module);
+        if !staged.exists() {
+            ok = false;
+            exit_code = quod_sandbox::EXIT_INFRA_ERROR;
+            diagnostics.push(format!(
+                "bwrap audit passed but staged .olean missing at {}",
+                staged.display()
+            ));
+            warn!(task_id, candidate_module, "missing staged .olean after bwrap verification");
+        } else {
+            persist_olean_file(&staged, &module_olean_path(&persist_dir, candidate_module))?;
+        }
     }
 
     Ok(AuditVerdict {
         ok,
-        exit_code: outcome.exit_code,
+        exit_code,
         kind,
         code_sha256: sha256_hex(code.as_bytes()),
         compile_ms: outcome.compile_ms,
@@ -524,6 +748,148 @@ mod tests {
         assert!(process_one_job(&store, &blobs, &cfg).await.unwrap());
 
         let g = store.project_graph("smoke", 1).await.unwrap().unwrap();
+        assert_eq!(g.project_status, ProjectStatus::Proved);
+    }
+
+    #[test]
+    fn expand_lean_search_paths_discovers_package_subdirs() {
+        let root = tempfile::tempdir().unwrap();
+        let pkg_a = root.path().join("mathlib");
+        let pkg_b = root.path().join("aesop");
+        let empty_dir = root.path().join("docs");
+        std::fs::create_dir_all(&pkg_a).unwrap();
+        std::fs::create_dir_all(&pkg_b).unwrap();
+        std::fs::create_dir_all(&empty_dir).unwrap();
+        std::fs::write(pkg_a.join("Mathlib.olean"), b"dummy").unwrap();
+        std::fs::write(pkg_b.join("Aesop.olean"), b"dummy").unwrap();
+
+        let expanded = expand_lean_search_paths(&[root.path().to_path_buf()]);
+        assert_eq!(
+            expanded,
+            vec![root.path().to_path_buf(), pkg_b, pkg_a]
+        );
+    }
+
+    #[tokio::test]
+    async fn process_job_auto_compiles_spec_from_overlay_blob_without_spec_file() {
+        let store: Arc<dyn QuodStore> = Arc::new(MemoryStore::new());
+        let blob_tmp = tempfile::tempdir().unwrap();
+        let blobs: Arc<dyn BlobStore> = Arc::new(LocalFsBlobStore::new(blob_tmp.path()));
+
+        let (_, pk_w) = generate_keypair_hex();
+        store
+            .register_actor(&RegisterActorRequest {
+                actor_id: "w1".into(),
+                pubkey_ed25519: pk_w,
+                roles: vec![Role::Worker, Role::Orchestrator, Role::Blueprinter, Role::Admin],
+                project_scopes: vec![],
+                lineage_cluster: "test".into(),
+                initial_tier: Some(3),
+                skill_tags: vec![],
+                display_name: None,
+                git_email: None,
+            })
+            .await
+            .unwrap();
+        store
+            .register_bundle(&RegisterBundleRequest {
+                bundle_id: "lean-4.36.0".into(),
+                lean_toolchain: "leanprover/lean4:v4.36.0".into(),
+                mathlib_rev: "none".into(),
+                toolchain_dir: String::new(),
+                lean_paths: vec![],
+                bundle_sha256: "b0".into(),
+            })
+            .await
+            .unwrap();
+        store
+            .create_project(
+                "w1",
+                &CreateProjectRequest {
+                    project_id: "dyn-spec".into(),
+                    title: "DynSpec".into(),
+                    description: "auto-compile spec".into(),
+                    spec_namespace: "Quod.Epoch0".into(),
+                    default_bundle_id: Some("lean-4.36.0".into()),
+                },
+            )
+            .await
+            .unwrap();
+
+        let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("tests")
+            .join("fixtures")
+            .join("epoch0-smoke");
+        let spec_src = std::fs::read_to_string(root_dir.join("Spec.lean")).unwrap();
+        let spec_sha = blobs.put_bytes(spec_src.as_bytes()).unwrap();
+        store
+            .create_epoch(
+                "dyn-spec",
+                "w1",
+                &CreateEpochRequest {
+                    epoch_id: 1,
+                    bundle_id: "lean-4.36.0".into(),
+                    base_commit: "0000".into(),
+                    spec_module: "Spec".into(),
+                    spec_decl_name: "Quod.Epoch0.smoke_stmt".into(),
+                    spec_statement: "∀ n : Nat, (n + 1) + (n + 1) = 2 * n + 2".into(),
+                    spec_sha256: spec_sha,
+                    spec_code: Some(spec_src),
+                    root_task_id: "root".into(),
+                    auto_activate: true,
+                },
+            )
+            .await
+            .unwrap();
+
+        let accepted_tmp = tempfile::tempdir().unwrap();
+        let cfg = VerifierConfig {
+            spec_file: None,
+            accepted_olean_dir: accepted_tmp.path().to_path_buf(),
+            timeout_secs: 180,
+            ..Default::default()
+        };
+
+        let pkt = store
+            .claim_lease("dyn-spec", "w1", &ClaimLeaseRequest::default(), 60, 1)
+            .await
+            .unwrap()
+            .unwrap();
+        let proof_code = std::fs::read_to_string(root_dir.join("samples/proof_ok.lean")).unwrap();
+        let p_sha = blobs.put_bytes(proof_code.as_bytes()).unwrap();
+        store
+            .create_submission(NewSubmissionInput {
+                submission_id: Uuid::now_v7(),
+                project_id: "dyn-spec".into(),
+                actor_id: "w1".into(),
+                req: SubmitRequest {
+                    epoch_id: 1,
+                    task_id: "root".into(),
+                    lease_id: pkt.lease.unwrap().lease_id,
+                    kind: SubmissionKind::Proof,
+                    spec_sha256: pkt.spec_sha256,
+                    code_utf8: proof_code,
+                    idea_attr_id: None,
+                },
+                blob_sha256: p_sha,
+                received_at_ns: 1,
+                stage0_passed: true,
+                stage0_exit_code: 0,
+                stage0_diagnostics: vec![],
+            })
+            .await
+            .unwrap();
+
+        assert!(process_one_job(&store, &blobs, &cfg).await.unwrap());
+        assert!(
+            accepted_tmp
+                .path()
+                .join("dyn-spec/epoch_1/Spec.olean")
+                .exists()
+        );
+        let g = store.project_graph("dyn-spec", 1).await.unwrap().unwrap();
         assert_eq!(g.project_status, ProjectStatus::Proved);
     }
 }

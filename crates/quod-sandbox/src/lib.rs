@@ -209,6 +209,8 @@ pub struct SandboxRequest {
     pub candidate_module: String,
     pub submission_file: PathBuf,
     pub timeout_secs: u64,
+    #[serde(default)]
+    pub skip_harness: bool,
 }
 
 /// Result returned by Stage 1 sandboxed Lean kernel execution.
@@ -234,7 +236,11 @@ pub struct BwrapConfig {
     pub toolchain_dir: PathBuf,
     pub epoch_lean_paths: Vec<PathBuf>,
     pub accepted_olean_dir: Option<PathBuf>,
+    /// Per-job writable staging directory mounted at `/work/build` inside `bwrap`.
+    pub output_olean_dir: Option<PathBuf>,
     pub harness_path: PathBuf,
+    /// Wrap `timeout + bwrap` in `systemd-run --user --scope` (requires a user D-Bus session).
+    pub use_systemd_scope: bool,
     pub cpu_quota: String,
     pub memory_max: String,
     pub tasks_max: u32,
@@ -246,7 +252,9 @@ impl Default for BwrapConfig {
             toolchain_dir: PathBuf::from("/opt/quod/lean"),
             epoch_lean_paths: vec![PathBuf::from("/opt/quod/epoch_lib")],
             accepted_olean_dir: Some(PathBuf::from("/opt/quod/accepted_lib")),
+            output_olean_dir: None,
             harness_path: PathBuf::from("/opt/quod/harness/AuditHarness.lean"),
+            use_systemd_scope: false,
             cpu_quota: "200%".into(),
             memory_max: "6G".into(),
             tasks_max: 64,
@@ -254,7 +262,7 @@ impl Default for BwrapConfig {
     }
 }
 
-/// `systemd-run --user --scope` + `timeout` + `bwrap` zero-trust runner.
+/// `timeout` + `bwrap` zero-trust runner (with optional `systemd-run --user --scope`).
 #[derive(Debug, Clone)]
 pub struct BwrapRunner {
     config: BwrapConfig,
@@ -265,7 +273,16 @@ impl BwrapRunner {
         Self { config }
     }
 
-    /// Builds exact argv passed to `systemd-run`.
+    /// Program invoked by `run()` (`systemd-run` when `use_systemd_scope` is true, else `timeout`).
+    pub fn command_program(&self) -> &'static str {
+        if self.config.use_systemd_scope {
+            "systemd-run"
+        } else {
+            "timeout"
+        }
+    }
+
+    /// Builds exact argv passed to `command_program()`.
     pub fn build_command_args(&self, req: &SandboxRequest) -> Result<Vec<String>, SandboxError> {
         if req.task_id.is_empty()
             || !req
@@ -297,21 +314,31 @@ impl BwrapRunner {
             .unwrap_or_else(|| Path::new("/work/build"))
             .display()
             .to_string();
-        let shell_script = format!(
-            "mkdir -p {olean_parent} && lean -o {olean_out} {target_in_sandbox} && lean /opt/harness/AuditHarness.lean"
-        );
+        let shell_script = if req.skip_harness {
+            format!("mkdir -p {olean_parent} && lean -o {olean_out} {target_in_sandbox}")
+        } else {
+            format!(
+                "mkdir -p {olean_parent} && lean -o {olean_out} {target_in_sandbox} && lean /opt/harness/AuditHarness.lean"
+            )
+        };
 
-        let mut args = vec![
-            "--user".into(),
-            "--scope".into(),
-            "--quiet".into(),
-            "-p".into(),
-            format!("CPUQuota={}", self.config.cpu_quota),
-            "-p".into(),
-            format!("MemoryMax={}", self.config.memory_max),
-            "-p".into(),
-            format!("TasksMax={}", self.config.tasks_max),
-            "timeout".into(),
+        let mut args = Vec::new();
+        if self.config.use_systemd_scope {
+            args.extend([
+                "--user".into(),
+                "--scope".into(),
+                "--quiet".into(),
+                "-p".into(),
+                format!("CPUQuota={}", self.config.cpu_quota),
+                "-p".into(),
+                format!("MemoryMax={}", self.config.memory_max),
+                "-p".into(),
+                format!("TasksMax={}", self.config.tasks_max),
+                "timeout".into(),
+            ]);
+        }
+
+        args.extend([
             "--kill-after=5s".into(),
             format!("{}s", req.timeout_secs.max(1)),
             "bwrap".into(),
@@ -327,9 +354,11 @@ impl BwrapRunner {
             "--ro-bind".into(),
             "/lib".into(),
             "/lib".into(),
-            "--ro-bind".into(),
-            "/lib64".into(),
-            "/lib64".into(),
+        ]);
+        if Path::new("/lib64").exists() {
+            args.extend(["--ro-bind".into(), "/lib64".into(), "/lib64".into()]);
+        }
+        args.extend([
             "--proc".into(),
             "/proc".into(),
             "--dev".into(),
@@ -337,7 +366,7 @@ impl BwrapRunner {
             "--ro-bind".into(),
             self.config.toolchain_dir.display().to_string(),
             "/opt/lean".into(),
-        ];
+        ]);
 
         let mut sandbox_lean_paths = Vec::new();
         for (idx, host_dir) in self.config.epoch_lean_paths.iter().enumerate() {
@@ -361,12 +390,22 @@ impl BwrapRunner {
         sandbox_lean_paths.push("/work/build".into());
         let lean_path = sandbox_lean_paths.join(":");
 
+        if !req.skip_harness {
+            args.extend([
+                "--ro-bind".into(),
+                self.config.harness_path.display().to_string(),
+                "/opt/harness/AuditHarness.lean".into(),
+            ]);
+        }
+        args.extend(["--tmpfs".into(), "/work".into()]);
+        if let Some(out_dir) = &self.config.output_olean_dir {
+            args.extend([
+                "--bind".into(),
+                out_dir.display().to_string(),
+                "/work/build".into(),
+            ]);
+        }
         args.extend([
-            "--ro-bind".into(),
-            self.config.harness_path.display().to_string(),
-            "/opt/harness/AuditHarness.lean".into(),
-            "--tmpfs".into(),
-            "/work".into(),
             "--ro-bind".into(),
             req.submission_file.display().to_string(),
             target_in_sandbox,
@@ -395,7 +434,10 @@ impl SandboxRunner for BwrapRunner {
         Box::pin(async move {
             let args = self.build_command_args(&req)?;
             let started = Instant::now();
-            let output = Command::new("systemd-run").args(&args).output().await?;
+            let output = Command::new(self.command_program())
+                .args(&args)
+                .output()
+                .await?;
             let compile_ms = started.elapsed().as_millis() as u64;
             let raw_code = output.status.code().unwrap_or(EXIT_INFRA_ERROR);
             let mapped_code = match raw_code {
@@ -732,7 +774,7 @@ fn module_lean_path(root: &Path, module: &str) -> PathBuf {
     p
 }
 
-fn module_olean_path(root: &Path, module: &str) -> PathBuf {
+pub fn module_olean_path(root: &Path, module: &str) -> PathBuf {
     let mut p = root.to_path_buf();
     for seg in module.split('.') {
         p.push(seg);
@@ -741,7 +783,7 @@ fn module_olean_path(root: &Path, module: &str) -> PathBuf {
     p
 }
 
-fn join_lean_paths(paths: &[PathBuf]) -> String {
+pub fn join_lean_paths(paths: &[PathBuf]) -> String {
     if let Ok(joined) = std::env::join_paths(paths) {
         return joined.to_string_lossy().into_owned();
     }
@@ -796,22 +838,47 @@ mod tests {
     fn bwrap_command_builds_expected_isolation_flags() {
         let runner = BwrapRunner::new(BwrapConfig {
             epoch_lean_paths: vec![PathBuf::from("/opt/m1"), PathBuf::from("/opt/m2")],
+            output_olean_dir: Some(PathBuf::from("/tmp/staging-build")),
             ..Default::default()
         });
+        assert_eq!(runner.command_program(), "timeout");
         let args = runner
             .build_command_args(&SandboxRequest {
                 task_id: "task_001".into(),
                 candidate_module: "QuodCand_1".into(),
                 submission_file: PathBuf::from("/tmp/task_001.lean"),
                 timeout_secs: 45,
+                skip_harness: false,
             })
             .unwrap();
+        assert!(!args.contains(&"--user".to_string()));
         assert!(args.contains(&"bwrap".to_string()));
         assert!(args.contains(&"--unshare-all".to_string()));
         assert!(args.contains(&"/work/QuodCand_1.lean".to_string()));
+        assert!(args.contains(&"/opt/harness/AuditHarness.lean".to_string()));
         assert!(args.contains(
             &"/opt/epoch_lib/p0:/opt/epoch_lib/p1:/opt/accepted_lib:/work/build".to_string()
         ));
+        let tmpfs_pos = args.iter().position(|a| a == "--tmpfs").unwrap();
+        let bind_pos = args.iter().position(|a| a == "/tmp/staging-build").unwrap();
+        assert!(bind_pos > tmpfs_pos);
+
+        let scoped = BwrapRunner::new(BwrapConfig {
+            use_systemd_scope: true,
+            ..Default::default()
+        });
+        assert_eq!(scoped.command_program(), "systemd-run");
+        let scoped_args = scoped
+            .build_command_args(&SandboxRequest {
+                task_id: "spec-1".into(),
+                candidate_module: "Quod.Spec".into(),
+                submission_file: PathBuf::from("/tmp/Spec.lean"),
+                timeout_secs: 30,
+                skip_harness: true,
+            })
+            .unwrap();
+        assert!(scoped_args.contains(&"--user".to_string()));
+        assert!(!scoped_args.contains(&"/opt/harness/AuditHarness.lean".to_string()));
     }
 
     #[tokio::test]

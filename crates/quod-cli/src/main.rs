@@ -839,6 +839,44 @@ async fn run(cli: Cli) -> anyhow::Result<ExitCode> {
                 }
                 std::fs::write(&target_path, &packet.transitive_slice)?;
                 std::fs::write(dir.join("TASK.md"), render_task_md(&packet))?;
+
+                let mut fetch_mods = Vec::new();
+                for imp in &packet.curated_imports {
+                    if !fetch_mods.contains(imp) {
+                        fetch_mods.push(imp.clone());
+                    }
+                }
+                if !packet.spec_module.is_empty() && !fetch_mods.contains(&packet.spec_module) {
+                    fetch_mods.push(packet.spec_module.clone());
+                }
+                for mod_name in fetch_mods {
+                    if mod_name == "Mathlib"
+                        || mod_name.starts_with("Mathlib.")
+                        || mod_name.starts_with("Std.")
+                        || mod_name.starts_with("Init.")
+                        || mod_name.starts_with("Lean.")
+                    {
+                        continue;
+                    }
+                    let url = format!(
+                        "{base}/api/projects/{}/epochs/{}/overlays/{}/source",
+                        packet.project_id, packet.epoch_id, mod_name
+                    );
+                    if let Ok(ov_resp) = client.get(url).send().await
+                        && ov_resp.status().is_success()
+                        && let Ok(ov) = ov_resp.json::<OverlaySourceView>().await
+                    {
+                        let mut mod_path = dir.clone();
+                        for seg in mod_name.split('.') {
+                            mod_path.push(seg);
+                        }
+                        mod_path.set_extension("lean");
+                        if let Some(parent) = mod_path.parent() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                        std::fs::write(&mod_path, &ov.code_utf8)?;
+                    }
+                }
             }
             println!("{}", serde_json::to_string_pretty(&packet)?);
             Ok(ExitCode::SUCCESS)
