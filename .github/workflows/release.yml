@@ -25,11 +25,11 @@ jobs:
             target: aarch64-unknown-linux-musl
             build_server: true
             apt_pkgs: musl-tools
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             build_server: false
             apt_pkgs: ""
-          - os: macos-14
+          - os: macos-15
             target: x86_64-apple-darwin
             build_server: false
             apt_pkgs: ""
