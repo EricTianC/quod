@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            build_server: true
+            apt_pkgs: musl-tools
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            build_server: true
+            apt_pkgs: musl-tools
+          - os: macos-14
+            target: aarch64-apple-darwin
+            build_server: false
+            apt_pkgs: ""
+          - os: macos-14
+            target: x86_64-apple-darwin
+            build_server: false
+            apt_pkgs: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OS dependencies
+        if: matrix.apt_pkgs != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.apt_pkgs }}
+
+      - name: Install Rust target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build quod CLI
+        run: cargo build --release --locked --target ${{ matrix.target }} -p quod-cli
+
+      - name: Build quod server binaries
+        if: matrix.build_server
+        run: cargo build --release --locked --target ${{ matrix.target }} -p quod-hub -p quod-verifier
+
+      - name: Package release archives
+        run: |
+          mkdir -p dist
+          tar -C "target/${{ matrix.target }}/release" -czf "dist/quod-${{ matrix.target }}.tar.gz" quod
+          if [ "${{ matrix.build_server }}" = "true" ]; then
+            tar -C "target/${{ matrix.target }}/release" -czf "dist/quod-server-${{ matrix.target }}.tar.gz" quod-hub quod-verifier
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/SHA256SUMS
+          generate_release_notes: true

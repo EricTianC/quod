@@ -1,0 +1,13 @@
+/target/
+**/*.rs.bk
+.env
+.env.*
+!.env.example
+.DS_Store
+**/.venv/
+**/__pycache__/
+*.pyc
+.lake/
+build/
+tmp/
+dist/

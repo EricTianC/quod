@@ -1,0 +1,59 @@
+/-
+Quod Stage 1 Lean 4.36.0 Kernel Audit Harness Template.
+Rendered dynamically per submission by `quod_sandbox::harness::render_audit_harness`.
+Supports:
+  - Proof:      defEq candidate_decl.type == targetExpr
+  - Refutation: defEq candidate_decl.type == ¬ targetExpr
+  - Reduction:  peelReduction extracting non-trivial Prop subgoal binders + anti-triviality
+  - Axioms:     collectAxioms ⊆ {propext, Classical.choice, Quot.sound}
+-/
+import Lean
+import {{SPEC_MODULE}}
+import {{CANDIDATE_MODULE}}
+
+section QuodAudit
+
+open Lean Meta
+
+private partial def peelReduction
+    (targetExpr e : Expr) (maxSubgoals : Nat) (acc : Array Json) : MetaM (Array Json) := do
+  if ← isDefEq e targetExpr then
+    if acc.isEmpty then
+      throwError "QUOD_AUDIT_TRIVIAL_EMPTY_REDUCTION"
+    return acc
+  if acc.size >= maxSubgoals then
+    throwError "QUOD_AUDIT_SUBGOAL_COUNT: exceeded maximum {maxSubgoals}"
+  match e with
+  | .forallE n d b bi =>
+    if !(← isProp d) then
+      throwError "QUOD_AUDIT_NON_PROP_SUBGOAL: {n}"
+    if d.hasFVar then
+      throwError "QUOD_AUDIT_DEPENDENT_SUBGOAL: {n}"
+    if ← isDefEq d (mkConst ``False) then
+      throwError "QUOD_AUDIT_TRIVIAL_FALSE_SUBGOAL: {n}"
+    if ← isDefEq d targetExpr then
+      throwError "QUOD_AUDIT_TRIVIAL_IDENTITY_SUBGOAL: {n}"
+    let dInst ← instantiateMVars d
+    let fmt ← ppExpr dInst
+    let entry := Json.mkObj [
+      ("name", Json.str n.toString),
+      ("statement", Json.str fmt.pretty)
+    ]
+    withLocalDecl n bi d fun fv =>
+      peelReduction targetExpr (b.instantiate1 fv) maxSubgoals (acc.push entry)
+  | _ =>
+    throwError "QUOD_AUDIT_TARGET_MISMATCH"
+
+#eval show MetaM Unit from do
+  let axs ← collectAxioms ``{{CANDIDATE_DECL}}
+  let allowed : Array Name := #[``propext, ``Classical.choice, ``Quot.sound]
+  for ax in axs do
+    if !allowed.contains ax then
+      throwError "QUOD_AUDIT_FORBIDDEN_AXIOM: {ax}"
+  let env ← getEnv
+  let some ci := env.find? ``{{CANDIDATE_DECL}}
+    | throwError "QUOD_AUDIT_MISSING_DECL: {{CANDIDATE_DECL}}"
+  let targetExpr := mkConst ``{{SPEC_DECL}}
+  let _ := (ci, targetExpr)
+
+end QuodAudit

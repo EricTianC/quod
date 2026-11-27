@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: quod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quod}
+      POSTGRES_USER: ${POSTGRES_USER:-quod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quod_dev_password}
+    ports:
+      - "${QUOD_PG_PORT:-5432}:5432"
+    volumes:
+      - quod_pgdata:/var/lib/postgresql/data
+      - ./crates/quod-store/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quod} -d ${POSTGRES_DB:-quod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  quod_pgdata:

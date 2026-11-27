@@ -1,0 +1,18 @@
+[Unit]
+Description=Quod Stage 1/2 Lean Kernel Verification Daemon
+After=network-online.target quod-hub.service docker.service
+Wants=quod-hub.service
+
+[Service]
+Type=simple
+User=quod
+Group=quod
+EnvironmentFile=-/etc/quod/quod-verifier.env
+ExecStart=/opt/quod/bin/quod-verifier --runner bwrap --concurrency 4
+Restart=on-failure
+RestartSec=3s
+LimitNOFILE=65536
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

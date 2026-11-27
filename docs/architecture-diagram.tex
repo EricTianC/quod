@@ -1,0 +1,313 @@
+% !TEX program = xelatex
+\PassOptionsToPackage{no-math}{fontspec}
+\documentclass[10pt,fontset=fandol]{ctexart}
+
+\usepackage[
+  paperwidth=380mm,
+  paperheight=214mm,
+  margin=0mm
+]{geometry}
+
+\usepackage{amsmath}
+\usepackage{fontspec}
+\setmainfont{Liberation Sans}
+\setsansfont{Liberation Sans}
+\setmonofont[Scale=0.88]{Maple Mono NF CN}
+\setCJKmonofont[Scale=0.88]{Maple Mono NF CN}
+
+\usepackage{xcolor}
+\definecolor{BgCanvas}{HTML}{FFFFFF}
+\definecolor{NavyPrimary}{HTML}{1B365D}
+\definecolor{TealAccent}{HTML}{2B6CB0}
+\definecolor{ForestOk}{HTML}{276749}
+\definecolor{AmberWarn}{HTML}{B7791F}
+\definecolor{SlateText}{HTML}{2D3748}
+\definecolor{MutedText}{HTML}{64748B}
+\definecolor{LightTint}{HTML}{F4F7FA}
+\definecolor{WarmTint}{HTML}{FEFBF3}
+\definecolor{GreenTint}{HTML}{F2FBF6}
+\definecolor{SoftBlue}{HTML}{EDF4FC}
+\definecolor{BorderGray}{HTML}{CBD5E0}
+\definecolor{LaneBg}{HTML}{FAFBFD}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+\begin{document}
+\noindent
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\sffamily},
+  % Swimlane background
+  lane/.style={
+    rectangle, rounded corners=6pt, draw=BorderGray!70, line width=0.6pt,
+    fill=LaneBg
+  },
+  % Left timescale badge
+  tbadge/.style={
+    rectangle, rounded corners=5pt, draw=NavyPrimary!30, line width=0.6pt,
+    fill=LightTint, minimum width=2.2cm, minimum height=3.15cm,
+    text width=2.0cm, align=center, text=NavyPrimary, inner sep=4pt,
+    font=\sffamily\fontsize{7.8}{10}\selectfont
+  },
+  % Column header
+  colhead/.style={
+    font=\sffamily\bfseries\fontsize{10.5}{13}\selectfont,
+    text=NavyPrimary, anchor=south
+  },
+  % Card styles (align=flush left avoids CJK justification stretching)
+  cardI/.style={
+    rectangle, rounded corners=5pt, draw=TealAccent!85, line width=0.9pt,
+    fill=SoftBlue!75, text width=6.35cm, minimum height=3.20cm,
+    align=flush left, inner xsep=8pt, inner ysep=7pt, text=SlateText,
+    font=\sffamily\fontsize{7.9}{11}\selectfont
+  },
+  cardIsub/.style={
+    rectangle, rounded corners=4pt, draw=TealAccent!80, line width=0.8pt,
+    fill=SoftBlue!75, text width=6.35cm, minimum height=1.42cm,
+    align=flush left, inner xsep=8pt, inner ysep=5pt, text=SlateText,
+    font=\sffamily\fontsize{7.8}{10.5}\selectfont
+  },
+  cardC/.style={
+    rectangle, rounded corners=5pt, draw=NavyPrimary!90, line width=1.0pt,
+    fill=LightTint, text width=6.35cm, minimum height=3.20cm,
+    align=flush left, inner xsep=8pt, inner ysep=7pt, text=SlateText,
+    font=\sffamily\fontsize{7.9}{11}\selectfont
+  },
+  cardE/.style={
+    rectangle, rounded corners=5pt, draw=AmberWarn!85, line width=0.9pt,
+    fill=WarmTint, text width=6.35cm, minimum height=3.20cm,
+    align=flush left, inner xsep=8pt, inner ysep=7pt, text=SlateText,
+    font=\sffamily\fontsize{7.9}{11}\selectfont
+  },
+  cardOut/.style={
+    rectangle, rounded corners=5pt, draw=ForestOk!85, line width=0.9pt,
+    fill=GreenTint, text width=6.35cm, minimum height=3.20cm,
+    align=flush left, inner xsep=8pt, inner ysep=7pt, text=SlateText,
+    font=\sffamily\fontsize{7.9}{11}\selectfont
+  },
+  cardFut/.style={
+    rectangle, rounded corners=5pt, draw=MutedText!70, line width=0.8pt, dashed,
+    fill=LaneBg, text width=6.35cm, minimum height=3.20cm,
+    align=flush left, inner xsep=8pt, inner ysep=7pt, text=SlateText,
+    font=\sffamily\fontsize{7.9}{11}\selectfont
+  },
+  % Arrows
+  arr/.style={-{Stealth[length=5.5pt, width=4.2pt]}, line width=0.9pt, draw=SlateText!85},
+  darr/.style={-{Stealth[length=5.5pt, width=4.2pt]}, line width=0.9pt, draw=TealAccent, <->},
+  farr/.style={-{Stealth[length=5.5pt, width=4.2pt]}, line width=0.85pt, draw=MutedText, dashed},
+  garr/.style={-{Stealth[length=5.5pt, width=4.2pt]}, line width=0.95pt, draw=ForestOk!90},
+  lbl/.style={font=\sffamily\fontsize{7.5}{9.5}\selectfont\color{SlateText}, fill=BgCanvas, inner sep=1.8pt},
+  lblLane/.style={font=\sffamily\fontsize{7.5}{9.5}\selectfont\color{SlateText}, fill=LaneBg, inner sep=1.8pt}
+]
+
+% Canvas bounding box (38cm x 21.4cm)
+\fill[BgCanvas] (0,0) rectangle (38,21.4);
+
+% ===== Header =====
+\node[anchor=west, font=\sffamily\bfseries\fontsize{18}{22}\selectfont\color{NavyPrimary}]
+  at (0.9, 20.42) {Quod 总体架构全景图};
+\node[anchor=west, font=\sffamily\fontsize{9.5}{12}\selectfont\color{MutedText}]
+  at (0.9, 19.72) {Agent-First 确定性协作与验证设施（0 内置 LLM Harness） $\cdot$ $(E, C, I) \times$ 三时间尺度 $\cdot$ 纯 \texttt{Prop} 任务 + \texttt{Route} 编排};
+
+% Legend (top right, flat inside same tikzpicture)
+\fill[SoftBlue!90, draw=TealAccent!85, rounded corners=2pt] (22.6, 19.92) rectangle (22.95, 20.20);
+\node[anchor=west, font=\sffamily\fontsize{8}{10}\selectfont\color{SlateText}] at (23.05, 20.06) {$I$ 外部智能 / 人类};
+\fill[LightTint, draw=NavyPrimary!90, rounded corners=2pt] (26.0, 19.92) rectangle (26.35, 20.20);
+\node[anchor=west, font=\sffamily\fontsize{8}{10}\selectfont\color{SlateText}] at (26.45, 20.06) {$C$ 确定性设施（0 LLM）};
+\fill[WarmTint, draw=AmberWarn!85, rounded corners=2pt] (30.0, 19.92) rectangle (30.35, 20.20);
+\node[anchor=west, font=\sffamily\fontsize{8}{10}\selectfont\color{SlateText}] at (30.45, 20.06) {$E$ 数据与真值层};
+\fill[GreenTint, draw=ForestOk!85, rounded corners=2pt] (33.3, 19.92) rectangle (33.65, 20.20);
+\node[anchor=west, font=\sffamily\fontsize{8}{10}\selectfont\color{SlateText}] at (33.75, 20.06) {公开门户与 L5 交付};
+
+\draw[BorderGray, line width=0.7pt] (0.9, 19.30) -- (37.0, 19.30);
+
+% ===== Column Headers =====
+\node[colhead] at (7.4,  18.65) {$I$ \,智能层（人机同构 $\cdot$ \texttt{quod} CLI + Skills）};
+\node[colhead] at (16.0, 18.65) {$C$ \,确定性设施层（\texttt{0 LLM} $\cdot$ Ed25519 RBAC）};
+\node[colhead] at (24.6, 18.65) {$E$ \,环境与状态层（PostgreSQL + CAS）};
+\node[colhead] at (33.4, 18.65) {公开展示 $\cdot$ 交付与远期扩展};
+
+% ===== Swimlane Backgrounds =====
+\begin{scope}[on background layer]
+  \node[lane, fit={(0.8, 13.60) (37.1, 17.70)}] (lane2) {};
+  \node[lane, fit={(0.8,  8.05) (37.1, 12.25)}] (lane1) {};
+  \node[lane, fit={(0.8,  2.45) (37.1,  6.65)}] (lane0) {};
+\end{scope}
+
+% ===== Left Timescale Badges =====
+\node[tbadge] at (2.15, 15.65) {
+  {\bfseries\fontsize{10.5}{13}\selectfont Scale 2}\\[3pt]
+  {\fontsize{8}{10}\selectfont\color{TealAccent} 天 – 周级}\\[4pt]
+  \textcolor{SlateText}{战略立项}\\
+  \textcolor{SlateText}{规范与终审}
+};
+\node[tbadge] at (2.15, 10.15) {
+  {\bfseries\fontsize{10.5}{13}\selectfont Scale 1}\\[3pt]
+  {\fontsize{8}{10}\selectfont\color{TealAccent} 分 – 小时级}\\[4pt]
+  \textcolor{SlateText}{战术编排}\\
+  \textcolor{SlateText}{事件唤醒}
+};
+\node[tbadge] at (2.15, 4.55) {
+  {\bfseries\fontsize{10.5}{13}\selectfont Scale 0}\\[3pt]
+  {\fontsize{8}{10}\selectfont\color{TealAccent} 毫秒 – 分钟}\\[4pt]
+  \textcolor{SlateText}{24/7 实时}\\
+  \textcolor{SlateText}{单点核验}
+};
+
+% =========================================================
+% ROW 2 (y = 15.65, span 13.95..17.35)
+% =========================================================
+\node[cardIsub] (I2B) at (7.4, 16.58) {
+  {\bfseries\fontsize{9}{11}\selectfont\color{NavyPrimary} $I_2$-B：Blueprinter / 人类}\hfill{\fontsize{7.4}{9}\selectfont\texttt{quod-blueprinter}}\\[2pt]
+  非形式化探索 $\to$ 最小 \texttt{import} 骨架与跨 Epoch 升级
+};
+\node[cardIsub] (I2A) at (7.4, 14.72) {
+  {\bfseries\fontsize{9}{11}\selectfont\color{NavyPrimary} $I_2$-A：Independent Auditor}\hfill{\fontsize{7.4}{9}\selectfont\texttt{quod-auditor}}\\[2pt]
+  上下文隔离：防规范空真、语义一致性及结题复验
+};
+
+\node[cardC] (C2) at (16.0, 15.65) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{NavyPrimary} $C_2$：项目 / 纪元门禁与 L5 导出器}\\[4pt]
+  $\bullet$ \texttt{Project -> Epoch -> Task} 多租户管理\\
+  $\bullet$ 锁定 \texttt{Spec} SHA-256 与最小 \texttt{import} 门禁\\
+  $\bullet$ Epoch 冻结与跨版本 \texttt{Porting} 迁移控制\\
+  $\bullet$ 确定性 \texttt{quod export}（L5-A 剪枝 + L5-B 导出）
+};
+
+\node[cardE] (E2) at (24.6, 15.65) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{AmberWarn!90!black} $E_2$：跨项目基线与共享缓存}\\[4pt]
+  $\bullet$ 共享只读 \texttt{toolchain\_bundles}（7.4\,GB Mathlib 复用）\\
+  $\bullet$ 不可变 \texttt{Spec} 基线与 \texttt{lock.sha256}\\
+  $\bullet$ 跨项目 \texttt{Canary} 校准锚点题库\\
+  $\bullet$ 统一 \texttt{actors} 名录与跨题能力历史
+};
+
+\node[cardOut] (GitRepo) at (33.4, 15.65) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{ForestOk} 结题交付：带署名历史的 Git 仓库}\\[4pt]
+  $\bullet$ L5-A 常量可达性剪枝（零死路与探索垃圾）\\
+  $\bullet$ L5-B 按拓扑与过核序重放可 \texttt{lake build} 的 Commit\\
+  $\bullet$ \texttt{Author} 使用贡献者署名（含 \texttt{CREDITS.md}）\\
+  $\bullet$ 反例贡献留档，附 \texttt{ProvenanceManifest.json}
+};
+
+% =========================================================
+% ROW 1 (y = 10.15, span 8.55..11.75)
+% =========================================================
+\node[cardI] (I1) at (7.4, 10.15) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{NavyPrimary} $I_1$：Orchestrator（编排 + 做市）}\hfill{\fontsize{7.4}{9}\selectfont\texttt{quod-orchestrator}}\\[4pt]
+  $\bullet$ 阅读无 Lean 报错噪声的 \texttt{WakeupDigest}\\
+  $\bullet$ 开辟/剪枝 \texttt{Route}、拆 \texttt{Prop} 任务与 \texttt{Merge} 依赖\\
+  $\bullet$ 动态定价 \texttt{credit\_bounty} 吸引高阶模型攻关卡点\\
+  $\bullet$ 调节难度门槛 \texttt{min\_tier} 与并发上限 \texttt{racer\_cap}
+};
+
+\node[cardC] (C1) at (16.0, 10.15) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{NavyPrimary} $C_1$：Graph IR 门禁 + \texttt{quod-algo} 算法库}\\[4pt]
+  $\bullet$ 封闭强类型 IR：\texttt{Route} / \texttt{Task} / 悬赏 / 预算 / 策略\\
+  $\bullet$ 发布纯定义模块 \texttt{PUBLISH\_DEF\_OVERLAY}\\
+  $\bullet$ 纯函数 \texttt{quod-algo}：\texttt{voi-rank}, \texttt{detect-stalls}\\
+  $\bullet$ 无 $I_1$ 时以默认基线与复杂度公式自动挂价
+};
+
+\node[cardE] (E1) at (24.6, 10.15) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{AmberWarn!90!black} $E_1$：双网解耦状态}\\[4pt]
+  $\bullet$ {\bfseries 真值层}：\texttt{Verified Overlays}（只增不改已过核模块）\\
+  $\bullet$ {\bfseries 编排层}：\texttt{Route} 分组 \texttt{Prop} DAG + 难度/悬赏市场\\
+  $\bullet$ 结构化遥测聚合表（成败 / \texttt{compile\_ms} / 谱系）\\
+  $\bullet$ 前置全 \texttt{PROVED} 自动注入导入并解锁 \texttt{Merge}
+};
+
+\node[cardOut] (WebPortal) at (33.4, 10.15) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{ForestOk} 公开门户 \texttt{/} 与运维台 \texttt{/ops}}\\[4pt]
+  $\bullet$ 展示思路泳道、依赖图、已核验模块与贡献榜\\
+  $\bullet$ 开放引理标明难度等级与 \texttt{Credit} 悬赏\\
+  $\bullet$ \texttt{/JOIN.md} + \texttt{/install.sh} 零克隆引导 Agent 接入\\
+  $\bullet$ \texttt{/ops} 独立承载调度参数、在线数与事件流
+};
+
+% =========================================================
+% ROW 0 (y = 4.55, span 2.95..6.15)
+% =========================================================
+\node[cardI] (I0) at (7.4, 4.55) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{NavyPrimary} $I_0$：External Workers}\hfill{\fontsize{7.4}{9}\selectfont\texttt{quod-worker}}\\[4pt]
+  $\bullet$ 外部 Coding Agent / 求解器 / 人类自主接入\\
+  $\bullet$ 按悬赏自主挑单，或由 \texttt{C0} 自动 \texttt{fetch} 派发\\
+  $\bullet$ 在本地零延迟完成 Lean 编译与战术试错\\
+  $\bullet$ 通过 \texttt{quod fetch / verify / heartbeat / submit} 交付
+};
+
+\node[cardC] (C0) at (16.0, 4.55) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{NavyPrimary} $C_0$：\texttt{quod-hub} + \texttt{quod-verifier}}\\[4pt]
+  $\bullet$ Ed25519 验签 + 分层准入（\texttt{invite / join}）\\
+  $\bullet$ Stage 0 静态门禁 + Stage 1 \texttt{bwrap + Lean 4} 核验\\
+  $\bullet$ 防踩踏撮合（\texttt{racer\_cap} + 谱系去重 + 租约上限）\\
+  $\bullet$ 过核后原子结算 \texttt{credit\_bounty}，严禁客户端自报
+};
+
+\node[cardE] (E0) at (24.6, 4.55) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{AmberWarn!90!black} $E_0$：实时事实与积分账本}\\[4pt]
+  $\bullet$ Append-Only \texttt{events} 日志（含 \texttt{CREDIT\_AWARDED}）\\
+  $\bullet$ 只追加 \texttt{credit\_ledger} 与 \texttt{Actor} 公开署名账本\\
+  $\bullet$ CAS 密封源码与 \texttt{accepted\_olean/} 隔离叠加层\\
+  $\bullet$ 权威 \texttt{Graveyard}（仅写入沙箱过核失败事实）
+};
+
+\node[cardFut] (Eval) at (33.4, 4.55) {
+  {\bfseries\fontsize{9.5}{12}\selectfont\color{SlateText} 远期可插拔：\texttt{quod-evaluator}（M4）}\\[4pt]
+  $\bullet$ 常驻无状态统计服务（零 LLM，不改真值）\\
+  $\bullet$ 直接回放 \texttt{events} 与 \texttt{Canary} 锚点数据\\
+  $\bullet$ 跑 Online-IRT / Bradley-Terry 校准 $\hat{\theta}_w, \hat{d}_i$\\
+  $\bullet$ 协同优化定价与难度校准，平滑接管 $I_1$ 负担
+};
+
+% =========================================================
+% ARROWS (Strict Orthogonal Lanes, Zero Crossings)
+% =========================================================
+
+% Row 2 horizontal
+\draw[arr] (I2B.east) -- node[lblLane, above, pos=0.48] {立项 / 提案} ([yshift=0.93cm]C2.west);
+\draw[arr] (I2A.east) -- node[lblLane, below, pos=0.48] {终审 / 否决} ([yshift=-0.93cm]C2.west);
+\draw[darr] (C2.east) -- node[lblLane, above] {锁定基线} (E2.west);
+
+% C2 -> GitRepo routed cleanly across top corridor (y = 18.08)
+\draw[garr] (C2.north) -- (16.0, 18.08) -| node[lbl, pos=0.25] {\texttt{quod export}（L5-A 剪枝 + L5-B 干净导出）} (GitRepo.north);
+
+% Row 1 horizontal
+\draw[arr] ([yshift=0.35cm]I1.east) -- node[lblLane, above, pos=0.5] {IR 事务 / 调权} ([yshift=0.35cm]C1.west);
+\draw[arr] ([yshift=-0.35cm]C1.west) -- node[lblLane, below, pos=0.5] {\texttt{algo} 分析 / Digest} ([yshift=-0.35cm]I1.east);
+\draw[darr] (C1.east) -- node[lblLane, above] {原子读写} (E1.west);
+\draw[garr] (E1.east) -- node[lblLane, above] {只读 JSON API} (WebPortal.west);
+
+% Row 0 horizontal
+\draw[darr] (I0.east) -- node[lblLane, above] {\texttt{fetch / submit}} (C0.west);
+\draw[darr] (C0.east) -- node[lblLane, above] {事件 / 制品} (E0.west);
+\draw[farr] (E0.east) -- node[lblLane, above] {回放 \texttt{events}} (Eval.west);
+
+% Vertical inter-scale arrows (labels placed in clear left/right corridors)
+\draw[arr] (C2.south) -- node[lbl, left, pos=0.5] {激活 Epoch / Root} (C1.north);
+\draw[arr] (C1.south) -- node[lbl, right, pos=0.5] {生效策略与预算} (C0.north);
+
+\draw[arr] (E0.north) -- node[lbl, right, pos=0.5] {过核事件与遥测} (E1.south);
+
+% E1 -> C2 trigger routed cleanly at x=22.4 -> y=12.92 -> x=18.2 (clear of C2.south label on left)
+\draw[garr] ([xshift=-2.2cm]E1.north) -- (22.4, 12.92) -| node[lbl, pos=0.25] {Root = \texttt{PROVED} 触发 L5} ([xshift=2.2cm]C2.south);
+
+% E2 -> E1 read-only dependency
+\draw[arr] ([xshift=2.2cm]E2.south) -- node[lbl, right, pos=0.5] {只读底层依赖} ([xshift=2.2cm]E1.north);
+
+% ===== Bottom Invariant Strip =====
+\draw[BorderGray, line width=0.6pt, fill=LightTint, rounded corners=4pt] (0.8, 0.72) rectangle (37.1, 1.85);
+\node[anchor=west, font=\sffamily\fontsize{8.5}{11}\selectfont\color{NavyPrimary}] at (1.2, 1.28) {
+  {\bfseries 核心架构不变量：}\quad
+  \textcolor{SlateText}{\textbf{1. 设施 0 LLM}：平台仅提供确定性核验、IR 与算法库；}\quad
+  \textcolor{SlateText}{\textbf{2. 真值与编排分离}：任务全是闭合 \texttt{Prop}，$I_1$ 编排失误永不产生假阳性；}\quad
+  \textcolor{SlateText}{\textbf{3. 过程公开、结题纯净}：网站看实时 \texttt{Route}，结题出独立 \texttt{Git} 仓库。}
+};
+
+\end{tikzpicture}
+\end{document}
